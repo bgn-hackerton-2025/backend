@@ -11,11 +11,21 @@ RUN pip install --no-cache-dir -r requirements.txt
 # 4. Copy the rest of the application code into the container
 COPY . .
 
-# 5. Expose the port the app runs on (this is for documentation)
-# The PORT env var will be set by Cloud Run at runtime.
+# 5. Set build-time environment variables for migration
+# These will be overridden by runtime environment variables
+ARG DATABASE_URL
+ENV DATABASE_URL=${DATABASE_URL}
+
+# 6. Run database migrations during build
+RUN if [ -n "$DATABASE_URL" ]; then \
+        echo "Running database migrations during build..." && \
+        python -m alembic upgrade head; \
+    else \
+        echo "DATABASE_URL not provided, skipping migrations during build"; \
+    fi
+
+# 7. Expose the port the app runs on
 EXPOSE 8080
 
-# 6. Define the command to run your app using uvicorn
-# We use the PORT environment variable provided by Cloud Run.
-# The host '0.0.0.0' is crucial to accept connections from outside the container.
+# 8. Start the application directly (no migrations at runtime)
 CMD uvicorn main:app --host 0.0.0.0 --port ${PORT:-8080}

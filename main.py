@@ -36,6 +36,25 @@ async def root():
     """Root endpoint"""
     return {"message": "Welcome to BGN API"}
 
+@app.get("/health")
+async def health_check(db: Session = Depends(get_database_session)):
+    """Health check endpoint that also verifies database connection"""
+    try:
+        # Test database connection by running a simple query
+        db.execute("SELECT 1")
+        return {
+            "status": "healthy",
+            "message": "API and database are working",
+            "database": "connected"
+        }
+    except Exception as e:
+        return {
+            "status": "unhealthy", 
+            "message": "Database connection failed",
+            "error": str(e),
+            "database": "disconnected"
+        }
+
 @app.get("/info")
 async def info():
     """Info endpoint that displays 'It works'"""
