@@ -20,7 +20,7 @@
 Your existing Cloud Build trigger automatically deploys when you push to the `main` branch.
 **This is your current setup and it works perfectly!**
 
-### Method 2: Direct gcloud deploy (Manual)
+### Method 2: Direct gcloud deploy (Manual).
 ```bash
 gcloud run deploy classifier \
   --source . \
