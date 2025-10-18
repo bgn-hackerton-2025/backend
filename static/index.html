@@ -1,0 +1,437 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Gemini Image Analyzer API - Web Client</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 20px;
+        }
+        
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            background: white;
+            border-radius: 15px;
+            box-shadow: 0 20px 40px rgba(0,0,0,0.1);
+            padding: 30px;
+        }
+        
+        .header {
+            text-align: center;
+            margin-bottom: 30px;
+        }
+        
+        .header h1 {
+            color: #333;
+            font-size: 2.5em;
+            margin-bottom: 10px;
+        }
+        
+        .header p {
+            color: #666;
+            font-size: 1.1em;
+        }
+        
+        .config-section {
+            background: #f8f9fa;
+            padding: 20px;
+            border-radius: 10px;
+            margin-bottom: 30px;
+        }
+        
+        .upload-section {
+            border: 2px dashed #ddd;
+            border-radius: 10px;
+            padding: 40px;
+            text-align: center;
+            margin-bottom: 30px;
+            transition: border-color 0.3s;
+        }
+        
+        .upload-section:hover {
+            border-color: #667eea;
+        }
+        
+        .upload-section.dragover {
+            border-color: #667eea;
+            background: #f0f4ff;
+        }
+        
+        .form-group {
+            margin-bottom: 20px;
+        }
+        
+        .form-group label {
+            display: block;
+            margin-bottom: 5px;
+            font-weight: bold;
+            color: #333;
+        }
+        
+        .form-group input, .form-group textarea {
+            width: 100%;
+            padding: 10px;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+            font-size: 16px;
+        }
+        
+        .form-group textarea {
+            height: 100px;
+            resize: vertical;
+        }
+        
+        .btn {
+            background: #667eea;
+            color: white;
+            padding: 12px 24px;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 16px;
+            transition: background 0.3s;
+        }
+        
+        .btn:hover {
+            background: #5a6fd8;
+        }
+        
+        .btn:disabled {
+            background: #ccc;
+            cursor: not-allowed;
+        }
+        
+        .results-section {
+            margin-top: 30px;
+        }
+        
+        .image-preview {
+            max-width: 300px;
+            max-height: 300px;
+            border-radius: 10px;
+            margin: 20px auto;
+            display: block;
+        }
+        
+        .analysis-result {
+            background: #f8f9fa;
+            padding: 20px;
+            border-radius: 10px;
+            margin-top: 20px;
+            white-space: pre-wrap;
+            line-height: 1.6;
+        }
+        
+        .error {
+            background: #ffe6e6;
+            color: #d63384;
+            padding: 15px;
+            border-radius: 5px;
+            margin: 10px 0;
+        }
+        
+        .success {
+            background: #d1e7dd;
+            color: #0f5132;
+            padding: 15px;
+            border-radius: 5px;
+            margin: 10px 0;
+        }
+        
+        .loading {
+            text-align: center;
+            padding: 20px;
+        }
+        
+        .spinner {
+            border: 4px solid #f3f3f3;
+            border-top: 4px solid #667eea;
+            border-radius: 50%;
+            width: 40px;
+            height: 40px;
+            animation: spin 1s linear infinite;
+            margin: 0 auto;
+        }
+        
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+        
+        .grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 30px;
+            margin-top: 20px;
+        }
+        
+        @media (max-width: 768px) {
+            .grid {
+                grid-template-columns: 1fr;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>🔍 Gemini Image Analyzer API</h1>
+            <p>Upload an image to get detailed AI-powered analysis</p>
+        </div>
+        
+        <!-- API Key Configuration -->
+        <div class="config-section">
+            <div class="form-group">
+                <label for="apiKey">Google API Key:</label>
+                <input type="password" id="apiKey" placeholder="Enter your Google API key (optional if set in server environment)">
+                <button class="btn" onclick="setApiKey()" style="margin-top: 10px;">Configure API Key</button>
+            </div>
+        </div>
+        
+        <!-- Image Upload -->
+        <div class="upload-section" id="uploadArea">
+            <input type="file" id="imageInput" accept="image/*" style="display: none;" onchange="handleFileSelect(event)">
+            <div onclick="document.getElementById('imageInput').click()">
+                <h3>📁 Click to select an image or drag & drop here</h3>
+                <p>Supported formats: PNG, JPG, JPEG, GIF, BMP, WEBP (Max: 16MB)</p>
+            </div>
+        </div>
+        
+        <!-- Custom Prompt -->
+        <div class="form-group">
+            <label for="customPrompt">Custom Analysis Prompt (Optional):</label>
+            <textarea id="customPrompt" placeholder="e.g., 'Describe the emotions visible in this image' or 'What architectural style is shown?'"></textarea>
+        </div>
+        
+        <!-- Analyze Button -->
+        <div style="text-align: center;">
+            <button class="btn" id="analyzeBtn" onclick="analyzeImage()" disabled>🔍 Analyze Image</button>
+        </div>
+        
+        <!-- Results -->
+        <div class="results-section" id="results"></div>
+    </div>
+
+    <script>
+        const API_BASE_URL = 'http://localhost:8080';
+        let selectedFile = null;
+        
+        // Drag and drop functionality
+        const uploadArea = document.getElementById('uploadArea');
+        
+        uploadArea.addEventListener('dragover', (e) => {
+            e.preventDefault();
+            uploadArea.classList.add('dragover');
+        });
+        
+        uploadArea.addEventListener('dragleave', () => {
+            uploadArea.classList.remove('dragover');
+        });
+        
+        uploadArea.addEventListener('drop', (e) => {
+            e.preventDefault();
+            uploadArea.classList.remove('dragover');
+            const files = e.dataTransfer.files;
+            if (files.length > 0) {
+                handleFile(files[0]);
+            }
+        });
+        
+        function handleFileSelect(event) {
+            const file = event.target.files[0];
+            if (file) {
+                handleFile(file);
+            }
+        }
+        
+        function handleFile(file) {
+            // Validate file type
+            const allowedTypes = ['image/png', 'image/jpeg', 'image/jpg', 'image/gif', 'image/bmp', 'image/webp'];
+            if (!allowedTypes.includes(file.type)) {
+                showError('Please select a valid image file (PNG, JPG, JPEG, GIF, BMP, WEBP)');
+                return;
+            }
+            
+            // Validate file size (16MB)
+            if (file.size > 16 * 1024 * 1024) {
+                showError('File size must be less than 16MB');
+                return;
+            }
+            
+            selectedFile = file;
+            
+            // Show image preview
+            const reader = new FileReader();
+            reader.onload = (e) => {
+                const preview = `
+                    <div style="text-align: center;">
+                        <h3>📸 Selected Image:</h3>
+                        <img src="${e.target.result}" class="image-preview" alt="Selected image">
+                        <p><strong>File:</strong> ${file.name} (${formatFileSize(file.size)})</p>
+                    </div>
+                `;
+                document.getElementById('results').innerHTML = preview;
+            };
+            reader.readAsDataURL(file);
+            
+            // Enable analyze button
+            document.getElementById('analyzeBtn').disabled = false;
+        }
+        
+        async function setApiKey() {
+            const apiKey = document.getElementById('apiKey').value.trim();
+            
+            if (!apiKey) {
+                showError('Please enter an API key');
+                return;
+            }
+            
+            try {
+                const response = await fetch(`${API_BASE_URL}/config`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({ api_key: apiKey })
+                });
+                
+                const result = await response.json();
+                
+                if (response.ok) {
+                    showSuccess('API key configured successfully!');
+                } else {
+                    showError(result.message || 'Failed to configure API key');
+                }
+            } catch (error) {
+                showError(`Error: ${error.message}`);
+            }
+        }
+        
+        async function analyzeImage() {
+            if (!selectedFile) {
+                showError('Please select an image first');
+                return;
+            }
+            
+            const analyzeBtn = document.getElementById('analyzeBtn');
+            analyzeBtn.disabled = true;
+            analyzeBtn.textContent = '🔍 Analyzing...';
+            
+            // Show loading state
+            showLoading();
+            
+            try {
+                const formData = new FormData();
+                formData.append('image', selectedFile);
+                
+                const customPrompt = document.getElementById('customPrompt').value.trim();
+                if (customPrompt) {
+                    formData.append('prompt', customPrompt);
+                }
+                
+                const response = await fetch(`${API_BASE_URL}/analyze`, {
+                    method: 'POST',
+                    body: formData
+                });
+                
+                const result = await response.json();
+                
+                if (response.ok) {
+                    showResults(result);
+                } else {
+                    showError(result.message || 'Analysis failed');
+                }
+            } catch (error) {
+                showError(`Error: ${error.message}`);
+            } finally {
+                analyzeBtn.disabled = false;
+                analyzeBtn.textContent = '🔍 Analyze Image';
+            }
+        }
+        
+        function showLoading() {
+            document.getElementById('results').innerHTML = `
+                <div class="loading">
+                    <div class="spinner"></div>
+                    <p>Analyzing image with Gemini AI...</p>
+                </div>
+            `;
+        }
+        
+        function showResults(result) {
+            const resultsHtml = `
+                <div class="grid">
+                    <div>
+                        <h3>📸 Image Information:</h3>
+                        <div class="analysis-result">
+<strong>Filename:</strong> ${result.image_info.filename}
+<strong>Size:</strong> ${formatFileSize(result.image_info.size)}
+<strong>Dimensions:</strong> ${result.image_info.dimensions[0]} × ${result.image_info.dimensions[1]}
+<strong>Format:</strong> ${result.image_info.format}
+<strong>Mode:</strong> ${result.image_info.mode}
+                        </div>
+                    </div>
+                    <div>
+                        <h3>🤖 AI Analysis:</h3>
+                        <div class="analysis-result">${result.analysis}</div>
+                        <p><strong>Prompt used:</strong> ${result.prompt_used}</p>
+                    </div>
+                </div>
+            `;
+            document.getElementById('results').innerHTML = resultsHtml;
+        }
+        
+        function showError(message) {
+            const errorDiv = document.createElement('div');
+            errorDiv.className = 'error';
+            errorDiv.textContent = message;
+            document.getElementById('results').appendChild(errorDiv);
+        }
+        
+        function showSuccess(message) {
+            const successDiv = document.createElement('div');
+            successDiv.className = 'success';
+            successDiv.textContent = message;
+            document.getElementById('results').appendChild(successDiv);
+        }
+        
+        function formatFileSize(bytes) {
+            if (bytes === 0) return '0 Bytes';
+            const k = 1024;
+            const sizes = ['Bytes', 'KB', 'MB', 'GB'];
+            const i = Math.floor(Math.log(bytes) / Math.log(k));
+            return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
+        }
+        
+        // Check API status on load
+        async function checkApiStatus() {
+            try {
+                const response = await fetch(`${API_BASE_URL}/info`);
+                const info = await response.json();
+                
+                if (info.api_key_configured) {
+                    showSuccess('API is ready to use!');
+                } else {
+                    showError('API key not configured. Please set your Google API key.');
+                }
+            } catch (error) {
+                showError('Cannot connect to API server. Make sure the Flask app is running on localhost:5000');
+            }
+        }
+        
+        // Check status on page load
+        window.onload = checkApiStatus;
+    </script>
+</body>
+</html>
