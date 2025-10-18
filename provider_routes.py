@@ -4,6 +4,7 @@ import google.generativeai as genai
 from PIL import Image
 import io
 import json
+import os
 from datetime import datetime
 from typing import Dict, Any
 import uuid
@@ -34,6 +35,13 @@ async def upload_inventory(file: UploadFile = File(...)):
         # Convert to RGB if necessary
         if image.mode != 'RGB':
             image = image.convert('RGB')
+        
+        # Configure Google Generative AI with API key
+        api_key = os.getenv("GOOGLE_API_KEY")
+        if not api_key:
+            raise HTTPException(status_code=500, detail="Google API key not configured")
+        
+        genai.configure(api_key=api_key)
         
         # Initialize the Gemini model
         model = genai.GenerativeModel('gemini-2.0-flash')

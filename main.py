@@ -14,7 +14,11 @@ from database.database import get_database_session
 load_dotenv()
 
 # Configure Google Generative AI
-genai.configure(api_key=os.getenv("GOOGLE_API_KEY"))
+api_key = os.getenv("GOOGLE_API_KEY")
+if not api_key:
+    print("Warning: GOOGLE_API_KEY environment variable not set. Image processing endpoints will not work.")
+else:
+    genai.configure(api_key=api_key)
 
 # Create FastAPI instance
 app = FastAPI(
@@ -100,6 +104,10 @@ async def classify_image(file: UploadFile = File(...)):
         if image.mode != 'RGB':
             image = image.convert('RGB')
         
+        # Check if API key is configured
+        if not os.getenv("GOOGLE_API_KEY"):
+            raise HTTPException(status_code=500, detail="Google API key not configured")
+        
         # Initialize the Gemini model
         model = genai.GenerativeModel('gemini-2.0-flash')
         
@@ -132,6 +140,10 @@ async def classify_objects(file: UploadFile = File(...)):
         # Convert to RGB if necessary
         if image.mode != 'RGB':
             image = image.convert('RGB')
+        
+        # Check if API key is configured
+        if not os.getenv("GOOGLE_API_KEY"):
+            raise HTTPException(status_code=500, detail="Google API key not configured")
         
         # Initialize the Gemini model
         model = genai.GenerativeModel('gemini-2.0-flash')
