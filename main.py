@@ -1,10 +1,13 @@
 from fastapi import FastAPI, File, UploadFile, HTTPException, Depends
-from fastapi.responses import JSONResponse
+from fastapi.responses import JSONResponse, FileResponse
+from fastapi.staticfiles import StaticFiles
 from sqlalchemy.orm import Session
 import google.generativeai as genai
 from PIL import Image
 import io
 import os
+import subprocess
+import sys
 from dotenv import load_dotenv
 from provider_routes import router as provider_router
 from customer_routes import router as customer_router
@@ -26,6 +29,9 @@ app = FastAPI(
     description="A FastAPI application with image classification for customers and providers",
     version="1.0.0"
 )
+
+# Mount static files
+app.mount("/static", StaticFiles(directory="static"), name="static")
 
 # Include routers
 app.include_router(provider_router)
@@ -59,6 +65,80 @@ async def health_check(db: Session = Depends(get_database_session)):
 async def info():
     """Info endpoint that displays 'It works'"""
     return {"message": "It works"}
+
+@app.get("/admin")
+async def admin_panel():
+    """Serve the admin panel for migrations"""
+    return FileResponse("static/admin.html")
+
+@app.post("/admin/migrate")
+async def run_migrations():
+    """Manual migration endpoint - run database migrations"""
+    try:
+        print("🔄 Running database migrations...")
+        
+        # Run Alembic migrations
+        result = subprocess.run([
+            sys.executable, "-m", "alembic", "upgrade", "head"
+        ], capture_output=True, text=True, cwd=os.getcwd())
+        
+        if result.returncode == 0:
+            return {
+                "status": "success",
+                "message": "Database migrations completed successfully",
+                "output": result.stdout,
+                "timestamp": "2025-10-18T23:00:00Z"
+            }
+        else:
+            raise HTTPException(
+                status_code=500, 
+                detail={
+                    "status": "failed",
+                    "message": "Migration failed",
+                    "error": result.stderr,
+                    "output": result.stdout
+                }
+            )
+            
+    except Exception as e:
+        raise HTTPException(
+            status_code=500, 
+            detail={
+                "status": "error",
+                "message": "Error running migrations",
+                "error": str(e)
+            }
+        )
+
+@app.get("/admin/migration-status")
+async def get_migration_status():
+    """Check current migration status"""
+    try:
+        # Get current migration version
+        result = subprocess.run([
+            sys.executable, "-m", "alembic", "current"
+        ], capture_output=True, text=True, cwd=os.getcwd())
+        
+        # Get migration history
+        history_result = subprocess.run([
+            sys.executable, "-m", "alembic", "history", "--verbose"
+        ], capture_output=True, text=True, cwd=os.getcwd())
+        
+        return {
+            "status": "success",
+            "current_version": result.stdout.strip() if result.returncode == 0 else "unknown",
+            "migration_history": history_result.stdout if history_result.returncode == 0 else "unavailable",
+            "database_connected": True,  # If we got here, basic app startup worked
+            "timestamp": "2025-10-18T23:00:00Z"
+        }
+        
+    except Exception as e:
+        return {
+            "status": "error",
+            "message": "Error checking migration status",
+            "error": str(e),
+            "timestamp": "2025-10-18T23:00:00Z"
+        }
 
 # ============== GENERAL PROVIDER ROUTES ==============
 

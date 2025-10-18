@@ -1,4 +1,4 @@
-# Google Cloud Run Deployment with Build-Time Migrations
+# Google Cloud Run Deployment with Manual Migrations
 
 ## Prerequisites
 1. Google Cloud CLI installed and authenticated
@@ -6,56 +6,50 @@
 3. Cloud SQL PostgreSQL instance set up
 4. Database connection string ready
 
-## Build-Time Migration Approach
+## Manual Migration Approach
 
-**Migrations now run during Docker build**, ensuring:
-- ✅ Database schema is updated before deployment
-- ✅ Faster container startup (no migration delays)
-- ✅ Build fails if migrations fail (prevents bad deployments)
-- ✅ Consistent database state across deployments
+**Migrations are now triggered manually via API endpoint**, providing:
+- ✅ Full control over when migrations run
+- ✅ Ability to run migrations on live production system
+- ✅ Fast deployments (no migration delays)
+- ✅ Migration status monitoring via API
 
 ## Deployment Methods
 
-### Method 1: Manual Build and Deploy
+### Method 1: Automatic Deployment (GitHub Push) - RECOMMENDED
+Your existing Cloud Build trigger automatically deploys when you push to the `main` branch.
+**This is your current setup and it works perfectly!**
 
+### Method 2: Direct gcloud deploy (Manual)
 ```bash
-# Build with migrations
-docker build \
-  --build-arg DATABASE_URL="your_postgres_connection_string" \
-  -t gcr.io/PROJECT_ID/classifier .
-
-# Push to registry
-docker push gcr.io/PROJECT_ID/classifier
-
-# Deploy to Cloud Run
 gcloud run deploy classifier \
-  --image gcr.io/PROJECT_ID/classifier \
+  --source . \
   --platform managed \
   --region us-central1 \
   --allow-unauthenticated \
   --set-env-vars GOOGLE_API_KEY=your_api_key,DATABASE_URL=your_postgres_connection_string
 ```
 
-### Method 2: Cloud Build (Recommended)
+## Running Migrations
 
+After deployment, run migrations manually via the API:
+
+### Trigger Migration
 ```bash
-# Deploy using Cloud Build with substitution variables
-gcloud builds submit \
-  --config cloudbuild.yaml \
-  --substitutions _DATABASE_URL="your_postgres_connection_string",_GOOGLE_API_KEY="your_api_key"
+# Run migrations on your deployed service
+curl -X POST https://your-service-url/admin/migrate
+
+# Or using your local service for testing
+curl -X POST http://localhost:8000/admin/migrate
 ```
 
-### Method 3: Direct gcloud deploy with build args
-
+### Check Migration Status
 ```bash
-# This approach builds in Cloud Build with the DATABASE_URL
-gcloud run deploy classifier \
-  --source . \
-  --platform managed \
-  --region us-central1 \
-  --allow-unauthenticated \
-  --set-env-vars GOOGLE_API_KEY=your_api_key,DATABASE_URL=your_postgres_connection_string \
-  --set-build-env-vars DATABASE_URL=your_postgres_connection_string
+# Check current migration status
+curl https://your-service-url/admin/migration-status
+
+# Or locally
+curl http://localhost:8000/admin/migration-status
 ```
 
 ## Environment Variables

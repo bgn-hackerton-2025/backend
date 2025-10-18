@@ -1,0 +1,85 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>BGN API - Migration Admin</title>
+    <style>
+        body { font-family: Arial, sans-serif; margin: 20px; }
+        .endpoint { background: #f5f5f5; padding: 10px; margin: 10px 0; border-radius: 5px; }
+        .method { color: #333; font-weight: bold; }
+        .post { color: #e74c3c; }
+        .get { color: #27ae60; }
+        button { padding: 10px 15px; margin: 5px; border: none; border-radius: 5px; cursor: pointer; }
+        .btn-primary { background: #3498db; color: white; }
+        .btn-danger { background: #e74c3c; color: white; }
+        .result { background: #ecf0f1; padding: 10px; margin: 10px 0; border-radius: 5px; max-height: 300px; overflow-y: auto; }
+    </style>
+</head>
+<body>
+    <h1>BGN API - Migration Admin Panel</h1>
+    
+    <div class="endpoint">
+        <h3><span class="method get">GET</span> /admin/migration-status</h3>
+        <p>Check current database migration status</p>
+        <button class="btn-primary" onclick="checkStatus()">Check Status</button>
+    </div>
+    
+    <div class="endpoint">
+        <h3><span class="method post">POST</span> /admin/migrate</h3>
+        <p>Run database migrations (alembic upgrade head)</p>
+        <button class="btn-danger" onclick="runMigrations()">Run Migrations</button>
+    </div>
+    
+    <div class="endpoint">
+        <h3><span class="method get">GET</span> /health</h3>
+        <p>Check application and database health</p>
+        <button class="btn-primary" onclick="checkHealth()">Check Health</button>
+    </div>
+    
+    <div id="result" class="result" style="display: none;">
+        <h4>Result:</h4>
+        <pre id="resultContent"></pre>
+    </div>
+
+    <script>
+        function showResult(data) {
+            document.getElementById('resultContent').textContent = JSON.stringify(data, null, 2);
+            document.getElementById('result').style.display = 'block';
+        }
+
+        async function checkStatus() {
+            try {
+                const response = await fetch('/admin/migration-status');
+                const data = await response.json();
+                showResult(data);
+            } catch (error) {
+                showResult({error: error.message});
+            }
+        }
+
+        async function runMigrations() {
+            if (!confirm('Are you sure you want to run migrations? This will modify the database.')) {
+                return;
+            }
+            try {
+                const response = await fetch('/admin/migrate', {method: 'POST'});
+                const data = await response.json();
+                showResult(data);
+            } catch (error) {
+                showResult({error: error.message});
+            }
+        }
+
+        async function checkHealth() {
+            try {
+                const response = await fetch('/health');
+                const data = await response.json();
+                showResult(data);
+            } catch (error) {
+                showResult({error: error.message});
+            }
+        }
+    </script>
+</body>
+</html>
