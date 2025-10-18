@@ -18,4 +18,4 @@ EXPOSE 8080
 # 6. Define the command to run your app using uvicorn
 # We use the PORT environment variable provided by Cloud Run.
 # The host '0.0.0.0' is crucial to accept connections from outside the container.
-CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8080"]
+CMD uvicorn main:app --host 0.0.0.0 --port ${PORT:-8080}
