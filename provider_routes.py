@@ -316,11 +316,57 @@ async def update_inventory_item(inventory_id: str, update_data: Dict[str, Any]):
     }
 
 @router.delete("/inventory/{inventory_id}")
-async def delete_inventory_item(inventory_id: str):
+async def delete_inventory_item(inventory_id: str, db: Session = Depends(get_database_session)):
     """Delete an inventory item"""
-    return {
-        "message": f"Inventory item {inventory_id} deleted successfully",
-        "inventory_id": inventory_id,
-        "deleted_at": datetime.now().isoformat() + "Z",
-        "user_type": "provider"
-    }
+    try:
+        # Find the inventory item by ID
+        inventory_item = db.query(InventoryItem).filter(InventoryItem.id == inventory_id).first()
+        
+        if not inventory_item:
+            raise HTTPException(status_code=404, detail=f"Inventory item {inventory_id} not found")
+        
+        # Store item details for response before deletion
+        item_name = inventory_item.product_name
+        storage_path = inventory_item.storage_path
+        
+        # Delete the inventory item from database
+        db.delete(inventory_item)
+        db.commit()
+        
+        # Optionally delete the image from Google Cloud Storage
+        if storage_path:
+            try:
+                project_id = os.getenv("GOOGLE_CLOUD_PROJECT")
+                bucket_name = os.getenv("GCS_BUCKET")
+                
+                if bucket_name:
+                    if project_id:
+                        gcs_client = storage.Client(project=project_id)
+                    else:
+                        gcs_client = storage.Client()
+                    
+                    bucket = gcs_client.bucket(bucket_name)
+                    blob = bucket.blob(storage_path)
+                    
+                    # Delete the blob if it exists
+                    if blob.exists():
+                        blob.delete()
+                        print(f"Image deleted from Google Cloud Storage: {storage_path}")
+                    
+            except Exception as gcs_error:
+                print(f"Warning: Could not delete image from storage: {gcs_error}")
+                # Continue even if image deletion fails
+        
+        return {
+            "message": f"Inventory item '{item_name}' deleted successfully",
+            "inventory_id": inventory_id,
+            "deleted_at": datetime.now().isoformat() + "Z",
+            "user_type": "provider"
+        }
+        
+    except HTTPException:
+        # Re-raise HTTP exceptions (like 404)
+        raise
+    except Exception as e:
+        db.rollback()
+        raise HTTPException(status_code=500, detail=f"Error deleting inventory item: {str(e)}")
