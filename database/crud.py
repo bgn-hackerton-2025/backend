@@ -194,7 +194,7 @@ class InventoryCRUD:
         if not cleaned_query:
             return []
 
-        base_query = db.query(InventoryItem).filter(InventoryItem.status == InventoryStatus.ACTIVE)
+        base_query = db.query(InventoryItem).join(Provider).filter(InventoryItem.status == InventoryStatus.ACTIVE)
 
         if provider_id:
             base_query = base_query.filter(InventoryItem.provider_id == provider_id)
@@ -320,7 +320,7 @@ class InventoryCRUD:
     @staticmethod
     def get_random_inventory_items(db: Session, limit: int = 5) -> List[InventoryItem]:
         """Get random inventory items as fallback when search returns no results"""
-        total_count = db.query(InventoryItem).filter(InventoryItem.status == InventoryStatus.ACTIVE).count()
+        total_count = db.query(InventoryItem).join(Provider).filter(InventoryItem.status == InventoryStatus.ACTIVE).count()
         
         if total_count == 0:
             return []
@@ -328,6 +328,6 @@ class InventoryCRUD:
         # Get random offset
         random_offset = random.randint(0, max(0, total_count - limit))
         
-        return db.query(InventoryItem).filter(
+        return db.query(InventoryItem).join(Provider).filter(
             InventoryItem.status == InventoryStatus.ACTIVE
         ).offset(random_offset).limit(limit).all()
