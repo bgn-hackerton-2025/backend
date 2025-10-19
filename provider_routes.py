@@ -236,7 +236,7 @@ async def upload_inventory(file: UploadFile = File(...), db: Session = Depends(g
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Error processing inventory image: {str(e)}")
 
-@router.get("/inventory")
+@router.get("/inventories")
 async def get_provider_inventory(db: Session = Depends(get_database_session)):
     """Get provider's inventory list from database"""
     try:
@@ -257,6 +257,7 @@ async def get_provider_inventory(db: Session = Depends(get_database_session)):
                     "currency": item.currency
                 },
                 "marketability_score": item.marketability_score,
+                "image_url": item.image_url,
                 "upload_date": item.created_at.isoformat() + "Z" if item.created_at else None,
                 "status": item.status.value if item.status else "active"
             })
