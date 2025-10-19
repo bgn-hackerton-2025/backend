@@ -172,3 +172,5 @@ logs/
 test_results/
 
 imgs
+runvenv.ps1
+runserver.sh

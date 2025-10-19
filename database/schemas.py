@@ -86,6 +86,12 @@ class InventoryItemUpdate(BaseModel):
     status: Optional[InventoryStatusEnum] = None
     quantity: Optional[int] = Field(None, ge=0)
 
+# Customer Schemas
+
+class outfitGeneratorRequest(BaseModel):
+    prompt: str
+    
+
 class AIAnalysisResult(BaseModel):
     product_name: str
     category: Optional[str] = None
