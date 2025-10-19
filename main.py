@@ -2,6 +2,7 @@ from fastapi import FastAPI, File, UploadFile, HTTPException, Depends
 from fastapi.responses import JSONResponse, FileResponse
 from fastapi.staticfiles import StaticFiles
 from sqlalchemy.orm import Session
+from sqlalchemy import text
 import google.generativeai as genai
 from PIL import Image
 import io
@@ -47,7 +48,7 @@ async def health_check(db: Session = Depends(get_database_session)):
     """Health check endpoint that also verifies database connection"""
     try:
         # Test database connection by running a simple query
-        db.execute("SELECT 1")
+        db.execute(text("SELECT 1"))
         return {
             "status": "healthy",
             "message": "API and database are working",
