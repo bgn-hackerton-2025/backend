@@ -137,6 +137,12 @@ class InventoryItemResponse(InventoryItemBase):
     updated_at: datetime
     analyzed_at: Optional[datetime] = None
 
+class InventoryItemWithProviderResponse(InventoryItemResponse):
+    """Extended inventory response that includes provider business information"""
+    business_name: Optional[str] = None
+    business_address: Optional[str] = None
+    business_address_map_url: Optional[str] = None
+
 class InventoryUploadResponse(BaseModel):
     inventory_id: uuid.UUID
     filename: str
@@ -159,3 +165,13 @@ class InventoryListResponse(BaseModel):
     inventory_items: List[InventoryItemResponse]
     total_items: int
     active_items: int
+
+# Search Schemas
+class InventorySearchRequest(BaseModel):
+    query: str = Field(..., min_length=1, max_length=255, description="Search query; keywords matched in description")
+
+class InventorySearchResponse(BaseModel):
+    message: str
+    inventory_items: List[InventoryItemWithProviderResponse]
+    total_matches: int
+    query: str

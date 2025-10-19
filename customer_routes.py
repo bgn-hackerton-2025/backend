@@ -9,7 +9,7 @@ from database.models import Provider
 from outfit_generation.outfit_generator import outfit_generator
 from sqlalchemy.orm import Session
 from database.database import get_database_session
-from database.schemas import InventorySearchRequest, InventorySearchResponse, InventoryItemResponse, outfitGeneratorRequest
+from database.schemas import InventorySearchRequest, InventorySearchResponse, InventoryItemWithProviderResponse, outfitGeneratorRequest
 from database.crud import InventoryCRUD
 
 # Create router for customer routes
@@ -92,7 +92,15 @@ async def search_inventory(
         else:
             message = f"Found {len(matching_items)} matching items"
 
-        inventory_responses = [InventoryItemResponse.model_validate(item) for item in matching_items]
+        # Convert to response format and add provider information
+        inventory_responses = []
+        for item in matching_items:
+            # Create the response object with provider information
+            response_obj = InventoryItemWithProviderResponse.model_validate(item)
+            response_obj.business_name = item.provider.business_name
+            response_obj.business_address = item.provider.business_address
+            response_obj.business_address_map_url = f"https://maps.google.com/maps?q={item.provider.business_address.replace(' ', '+')}" if item.provider.business_address else None
+            inventory_responses.append(response_obj)
 
         return InventorySearchResponse(
             message=message,
