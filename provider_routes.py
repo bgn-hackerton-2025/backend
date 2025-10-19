@@ -17,6 +17,41 @@ from google.cloud import storage
 # Create router for provider routes
 router = APIRouter(prefix="/provider", tags=["Provider"])
 
+# I need an endpoint to update the provider
+@router.put("/update/{provider_id}")
+async def update_provider(provider_id: str, provider_data: Dict[str, Any], db: Session = Depends(get_database_session)):
+    """Update provider information"""
+    try:
+        # Find the specific provider by ID
+        provider = db.query(Provider).filter(Provider.id == provider_id).first()
+        if not provider:
+            raise HTTPException(status_code=404, detail=f"Provider with ID {provider_id} not found")
+        
+        # Update provider fields based on provided data
+        for key, value in provider_data.items():
+            if hasattr(provider, key):
+                setattr(provider, key, value)
+        
+        # Update the updated_at timestamp
+        provider.updated_at = datetime.utcnow()
+        
+        db.commit()
+        db.refresh(provider)
+        
+        return {
+            "message": "Provider information updated successfully",
+            "provider_id": str(provider.id),
+            "updated_fields": list(provider_data.keys()),
+            "timestamp": datetime.now().isoformat() + "Z",
+            "user_type": "provider"
+        }
+    except HTTPException:
+        # Re-raise HTTP exceptions (like 404)
+        raise
+    except Exception as e:
+        db.rollback()
+        raise HTTPException(status_code=500, detail=f"Error updating provider information: {str(e)}")
+
 @router.post("/upload-inventory")
 async def upload_inventory(file: UploadFile = File(...), db: Session = Depends(get_database_session)):
     """
@@ -258,6 +293,7 @@ async def get_provider_inventory(db: Session = Depends(get_database_session)):
                 "status": item.status.value if item.status else "active",
                 "provider_name": item.provider.name,
                 "business_address": item.provider.business_address,
+                "business_address_map_url": f"https://maps.google.com/maps?q={item.provider.business_address.replace(' ', '+')}" if item.provider.business_address else None,
             })
         
         return {
