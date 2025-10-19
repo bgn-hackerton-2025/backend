@@ -1,5 +1,5 @@
 from sqlalchemy.orm import Session
-from sqlalchemy import and_, or_, func
+from sqlalchemy import and_, or_, func, case
 from typing import List, Optional, Tuple
 from datetime import datetime
 import uuid
@@ -183,20 +183,56 @@ class InventoryCRUD:
         skip: int = 0,
         limit: int = 100
     ) -> List[InventoryItem]:
-        """Search inventory items by name, description, or brand"""
-        query = db.query(InventoryItem)
-        
+        """Use PostgreSQL full-text search (ranked) across key fields.
+
+        Combines weighted tsvectors for description (A), product_name (B),
+        brand (C), and category (C). Uses web-style query parsing and orders by
+        ts_rank_cd descending, then by most recent update. Not all words need
+        to match; ranking promotes best matches.
+        """
+        cleaned_query = (search_term or "").strip()
+        if not cleaned_query:
+            return []
+
+        base_query = db.query(InventoryItem).filter(InventoryItem.status == InventoryStatus.ACTIVE)
+
         if provider_id:
-            query = query.filter(InventoryItem.provider_id == provider_id)
-        
-        search_filter = or_(
-            InventoryItem.product_name.ilike(f"%{search_term}%"),
-            InventoryItem.description.ilike(f"%{search_term}%"),
-            InventoryItem.brand.ilike(f"%{search_term}%"),
-            InventoryItem.category.ilike(f"%{search_term}%")
+            base_query = base_query.filter(InventoryItem.provider_id == provider_id)
+
+        # Build weighted tsvector
+        desc_vec = func.setweight(
+            func.to_tsvector('english', func.coalesce(InventoryItem.description, '')),
+            'A'
         )
-        
-        return query.filter(search_filter).offset(skip).limit(limit).all()
+        name_vec = func.setweight(
+            func.to_tsvector('english', func.coalesce(InventoryItem.product_name, '')),
+            'B'
+        )
+        brand_vec = func.setweight(
+            func.to_tsvector('english', func.coalesce(InventoryItem.brand, '')),
+            'C'
+        )
+        cat_vec = func.setweight(
+            func.to_tsvector('english', func.coalesce(InventoryItem.category, '')),
+            'C'
+        )
+        combined_vec = desc_vec.op('||')(name_vec).op('||')(brand_vec).op('||')(cat_vec)
+
+        # Build tsquery using web-style parsing (supports quotes, -exclude, etc.)
+        tsquery = func.websearch_to_tsquery('english', cleaned_query)
+
+        rank_expr = func.ts_rank_cd(combined_vec, tsquery)
+
+        results = (
+            base_query
+            .filter(combined_vec.op('@@')(tsquery))
+            .order_by(rank_expr.desc(), InventoryItem.updated_at.desc())
+            .offset(skip)
+            .limit(limit)
+            .all()
+        )
+
+        return results
     
     @staticmethod
     def weighted_search_inventory(
