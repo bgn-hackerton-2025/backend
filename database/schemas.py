@@ -88,9 +88,10 @@ class InventoryItemUpdate(BaseModel):
 
 # Customer Schemas
 
+
 class outfitGeneratorRequest(BaseModel):
-    prompt: str
-    
+    prompt: str = Field(..., min_length=1, max_length=1000, description="Required: Prompt for outfit to be generated")
+
 
 class AIAnalysisResult(BaseModel):
     product_name: str
