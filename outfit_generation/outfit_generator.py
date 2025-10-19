@@ -1,4 +1,4 @@
-from google import genai
+import google.generativeai as genai
 from PIL import Image
 from io import BytesIO
 import os, base64
@@ -10,7 +10,7 @@ from database.schemas import outfitGeneratorRequest
 
 load_dotenv()
 api_key = os.getenv("GOOGLE_API_KEY")
-client = genai.Client(api_key=api_key)
+genai.configure(api_key=api_key)
 
 # Need 3 responses for 3 different outfit suggestions
 responses = []
@@ -30,17 +30,11 @@ def outfit_generator(requestBody: Optional[outfitGeneratorRequest], image_url: O
         contents.append(image)
 
 
+    # Initialize the Gemini model
+    model = genai.GenerativeModel('gemini-2.0-flash')
+    
     for i in range(3):
-        response = client.models.generate_content(
-            model="gemini-2.5-flash-image",  # must support image generation
-            contents=contents,
-            config={
-                "system_instruction": [
-                    """You are an outfit recommendation system for thrifted clothing.
-                    Generate a complete outfit image that pairs well with the given item."""
-                ]
-            },
-        )
+        response = model.generate_content(contents)
         responses.append(response)
 
     for res in responses:
@@ -55,7 +49,8 @@ def outfit_generator(requestBody: Optional[outfitGeneratorRequest], image_url: O
                 image_bytes = part.inline_data.data
                 base64_str = base64.b64encode(image_bytes).decode("utf-8")
                 print("Here's your outfit!")
-                response = client.models.generate_content(model="gemini-2.5-flash", contents=["""for each item; trousers, shirt, jacket (if any) IN THE GIVEN IMAGE, 
+                description_model = genai.GenerativeModel('gemini-2.0-flash')
+                response = description_model.generate_content(["""for each item; trousers, shirt, jacket (if any) IN THE GIVEN IMAGE, 
                                               generate a simple description of each in JSON form:
                                               a description of what it is, its colour, style, brand, aesthetic like so:
                                               "[{\"trousers\": \"description\"},{\"jacket\": \"description\"}, {\"shirt\": \"description\"}]. 

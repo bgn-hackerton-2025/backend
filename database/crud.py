@@ -1,13 +1,15 @@
 from sqlalchemy.orm import Session
-from sqlalchemy import and_, or_
+from sqlalchemy import and_, or_, func, case
 from typing import List, Optional
 from datetime import datetime
 import uuid
+import random
 
-from .models import Provider, InventoryItem
+from .models import Provider, InventoryItem, InventoryStatus
 from .schemas import (
     ProviderCreate, ProviderUpdate,
-    InventoryItemCreate, InventoryItemUpdate
+    InventoryItemCreate, InventoryItemUpdate,
+    InventorySearchRequest
 )
 
 # Provider CRUD Operations
