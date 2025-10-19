@@ -155,14 +155,10 @@ class InventoryListResponse(BaseModel):
 
 # Search Schemas
 class InventorySearchRequest(BaseModel):
-    category: str = Field(..., min_length=1, max_length=100, description="Required: Product category to search for")
-    subcategory: Optional[str] = Field(None, max_length=100, description="Optional: Product subcategory")
-    color: Optional[str] = Field(None, max_length=50, description="Optional: Product color")
-    style: Optional[str] = Field(None, max_length=100, description="Optional: Style to search in key_features")
-    aesthetic: Optional[str] = Field(None, max_length=100, description="Optional: Aesthetic to search in tags")
+    query: str = Field(..., min_length=1, max_length=255, description="Search query; keywords matched in description")
 
 class InventorySearchResponse(BaseModel):
     message: str
     inventory_items: List[InventoryItemResponse]
     total_matches: int
-    search_criteria: InventorySearchRequest
+    query: str
