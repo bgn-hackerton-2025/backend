@@ -240,8 +240,9 @@ async def upload_inventory(file: UploadFile = File(...), db: Session = Depends(g
 async def get_provider_inventory(db: Session = Depends(get_database_session)):
     """Get provider's inventory list from database"""
     try:
-        # Get all inventory items from database
-        inventory_items = db.query(InventoryItem).all()
+        # Get all inventory items from database with provider information
+        inventory_items = db.query(InventoryItem).join(Provider).all()
+
         
         items = []
         for item in inventory_items:
@@ -254,7 +255,9 @@ async def get_provider_inventory(db: Session = Depends(get_database_session)):
                 "marketability_score": item.marketability_score,
                 "image_url": item.image_url,
                 "upload_date": item.created_at.isoformat() + "Z" if item.created_at else None,
-                "status": item.status.value if item.status else "active"
+                "status": item.status.value if item.status else "active",
+                "provider_name": item.provider.name,
+                "business_address": item.provider.business_address,
             })
         
         return {
