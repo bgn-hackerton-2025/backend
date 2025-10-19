@@ -9,7 +9,7 @@ api_key = os.getenv("API_KEY")
 client = genai.Client(api_key=api_key)
 
 # Make sure you have an image file (e.g., 'shirt.jpg') in the same directory
-img = Image.open('imgs/carhartt--jacket.png')
+img = Image.open('imgs/carhartt-jacket-2.png')
 
 def outfit_generator(prompt: str, image: Image.Image): 
     # Generate content with both the text prompt and image input
@@ -30,6 +30,9 @@ def outfit_generator(prompt: str, image: Image.Image):
         elif part.inline_data is not None:
             image = Image.open(BytesIO(part.inline_data.data))
             image.save("generated_image/generated_image.png")
+
+
+
 
 
 # Example call
