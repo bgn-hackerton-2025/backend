@@ -1,13 +1,15 @@
 from sqlalchemy.orm import Session
-from sqlalchemy import and_, or_
-from typing import List, Optional
+from sqlalchemy import and_, or_, func
+from typing import List, Optional, Tuple
 from datetime import datetime
 import uuid
+import random
 
-from .models import Provider, InventoryItem
+from .models import Provider, InventoryItem, InventoryStatus
 from .schemas import (
     ProviderCreate, ProviderUpdate,
-    InventoryItemCreate, InventoryItemUpdate
+    InventoryItemCreate, InventoryItemUpdate,
+    InventorySearchRequest
 )
 
 # Provider CRUD Operations
@@ -195,3 +197,101 @@ class InventoryCRUD:
         )
         
         return query.filter(search_filter).offset(skip).limit(limit).all()
+    
+    @staticmethod
+    def weighted_search_inventory(
+        db: Session,
+        search_request: InventorySearchRequest,
+        skip: int = 0,
+        limit: int = 100
+    ) -> List[InventoryItem]:
+        """Weighted search for inventory items based on multiple criteria"""
+        query = db.query(InventoryItem).filter(InventoryItem.status == InventoryStatus.ACTIVE)
+        
+        # Build weighted search conditions
+        conditions = []
+        weights = []
+        
+        # Category (required) - highest weight
+        if search_request.category:
+            category_condition = InventoryItem.category.ilike(f"%{search_request.category}%")
+            conditions.append(category_condition)
+            weights.append(5)  # Highest weight for required field
+        
+        # Subcategory (optional) - high weight
+        if search_request.subcategory:
+            subcategory_condition = InventoryItem.subcategory.ilike(f"%{search_request.subcategory}%")
+            conditions.append(subcategory_condition)
+            weights.append(4)
+        
+        # Color (optional) - medium weight
+        if search_request.color:
+            color_condition = InventoryItem.color.ilike(f"%{search_request.color}%")
+            conditions.append(color_condition)
+            weights.append(3)
+        
+        # Style in key_features (optional) - medium weight
+        if search_request.style:
+            style_condition = func.array_to_string(InventoryItem.key_features, ',').ilike(f"%{search_request.style}%")
+            conditions.append(style_condition)
+            weights.append(3)
+        
+        # Aesthetic in tags (optional) - medium weight
+        if search_request.aesthetic:
+            aesthetic_condition = func.array_to_string(InventoryItem.tags, ',').ilike(f"%{search_request.aesthetic}%")
+            conditions.append(aesthetic_condition)
+            weights.append(3)
+        
+        # If no conditions, return empty list
+        if not conditions:
+            return []
+        
+        # Apply OR logic for matching any criteria
+        search_filter = and_(*conditions)
+        matching_items = query.filter(search_filter).all()
+        
+        # Calculate weighted scores for each item
+        scored_items = []
+        for item in matching_items:
+            score = 0
+            
+            # Check each condition and add weight if matched
+            if search_request.category and item.category and search_request.category.lower() in item.category.lower():
+                score += weights[0] if len(weights) > 0 else 0
+            
+            if search_request.subcategory and item.subcategory and search_request.subcategory.lower() in item.subcategory.lower():
+                score += weights[1] if len(weights) > 1 else 0
+            
+            if search_request.color and item.color and search_request.color.lower() in item.color.lower():
+                score += weights[2] if len(weights) > 2 else 0
+            
+            if search_request.style and item.key_features:
+                style_found = any(search_request.style.lower() in feature.lower() for feature in item.key_features)
+                if style_found:
+                    score += weights[3] if len(weights) > 3 else 0
+            
+            if search_request.aesthetic and item.tags:
+                aesthetic_found = any(search_request.aesthetic.lower() in tag.lower() for tag in item.tags)
+                if aesthetic_found:
+                    score += weights[4] if len(weights) > 4 else 0
+            
+            scored_items.append((item, score))
+        
+        # Sort by score (descending) and return top results
+        scored_items.sort(key=lambda x: x[1], reverse=True)
+        return [item for item, score in scored_items[skip:skip+limit]]
+    
+    @staticmethod
+    def get_random_inventory_items(db: Session, limit: int = 5) -> List[InventoryItem]:
+        """Get random inventory items as fallback when search returns no results"""
+        total_count = db.query(InventoryItem).filter(InventoryItem.status == InventoryStatus.ACTIVE).count()
+        
+        if total_count == 0:
+            return []
+        
+        # Get random offset
+        random_offset = random.randint(0, max(0, total_count - limit))
+        
+        return db.query(InventoryItem).filter(
+            InventoryItem.status == InventoryStatus.ACTIVE
+        ).offset(random_offset).limit(limit).all()
