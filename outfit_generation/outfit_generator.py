@@ -2,6 +2,7 @@ from google import genai
 from PIL import Image
 from io import BytesIO
 import os, base64
+import json
 from dotenv import load_dotenv
 from typing import Dict, Any, Optional
 from fastapi import File, UploadFile
@@ -54,7 +55,19 @@ def outfit_generator(requestBody: Optional[outfitGeneratorRequest], image_url: O
                 image_bytes = part.inline_data.data
                 base64_str = base64.b64encode(image_bytes).decode("utf-8")
                 print("Here's your outfit!")
-                output.append(base64_str)
+                response = client.models.generate_content(model="gemini-2.5-flash", contents=["""for each item; trousers, shirt, jacket (if any) IN THE GIVEN IMAGE, 
+                                              generate a simple description of each in JSON form:
+                                              a description of what it is, its colour, style, brand, aesthetic like so:
+                                              "[{\"trousers\": \"description\"},{\"jacket\": \"description\"}, {\"shirt\": \"description\"}]. 
+                                              If a certain item is not in the picture, don't include it in your response.
+                                              I only want keywords that I can then directly use in a full-text search of product descriptions.
+                                              Do not give me full sentences or phrases or clauses. Just keywords. This is all
+                                              I want in your response. generate the required JSON and nothing else. DON'T ADD ANY MARKDOWN FORMATTING. JUST RAW JSON that should be parseable by python json.loads.""", image])
+                
+
+                print(response)
+
+                output.append({"image": base64_str, "description": json.loads(response.text)})
 
     if image_url and os.path.exists(image_url):
             try:
@@ -62,5 +75,6 @@ def outfit_generator(requestBody: Optional[outfitGeneratorRequest], image_url: O
                 print(f"Cleaned up input image: {image_url}")
             except Exception as e:
                 print(f"Error deleting input image: {str(e)}")
+
         
     return output
