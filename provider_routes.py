@@ -251,11 +251,6 @@ async def get_provider_inventory(db: Session = Depends(get_database_session)):
                 "category": item.category,
                 "description": item.description,
                 "condition": item.condition,
-                "estimated_price": {
-                    "min": item.estimated_price_min,
-                    "max": item.estimated_price_max,
-                    "currency": item.currency
-                },
                 "marketability_score": item.marketability_score,
                 "image_url": item.image_url,
                 "upload_date": item.created_at.isoformat() + "Z" if item.created_at else None,
