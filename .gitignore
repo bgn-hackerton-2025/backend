@@ -171,9 +171,6 @@ logs/
 .coverage
 test_results/
 
-imgs
-runvenv.ps1
-runserver.sh
-response.json
-
 generated_image/generated_image.png
+.direnv/
+imgs

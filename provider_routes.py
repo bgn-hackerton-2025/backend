@@ -12,9 +12,45 @@ import uuid
 
 from database.models import InventoryItem, Provider
 from database.database import get_database_session
+from google.cloud import storage
 
 # Create router for provider routes
 router = APIRouter(prefix="/provider", tags=["Provider"])
+
+# I need an endpoint to update the provider
+@router.put("/update/{provider_id}")
+async def update_provider(provider_id: str, provider_data: Dict[str, Any], db: Session = Depends(get_database_session)):
+    """Update provider information"""
+    try:
+        # Find the specific provider by ID
+        provider = db.query(Provider).filter(Provider.id == provider_id).first()
+        if not provider:
+            raise HTTPException(status_code=404, detail=f"Provider with ID {provider_id} not found")
+        
+        # Update provider fields based on provided data
+        for key, value in provider_data.items():
+            if hasattr(provider, key):
+                setattr(provider, key, value)
+        
+        # Update the updated_at timestamp
+        provider.updated_at = datetime.utcnow()
+        
+        db.commit()
+        db.refresh(provider)
+        
+        return {
+            "message": "Provider information updated successfully",
+            "provider_id": str(provider.id),
+            "updated_fields": list(provider_data.keys()),
+            "timestamp": datetime.now().isoformat() + "Z",
+            "user_type": "provider"
+        }
+    except HTTPException:
+        # Re-raise HTTP exceptions (like 404)
+        raise
+    except Exception as e:
+        db.rollback()
+        raise HTTPException(status_code=500, detail=f"Error updating provider information: {str(e)}")
 
 @router.post("/upload-inventory")
 async def upload_inventory(file: UploadFile = File(...), db: Session = Depends(get_database_session)):
@@ -139,6 +175,79 @@ async def upload_inventory(file: UploadFile = File(...), db: Session = Depends(g
                 # Continue without database save if there's an error
                 print(f"Database save failed: {db_error}")
                 inventory_id = str(uuid.uuid4())
+
+            # Upload the image to Google Cloud Storage; use the provider ID and inventory ID for path
+            try:
+                # Configure Google Cloud Storage client
+                project_id = os.getenv("GOOGLE_CLOUD_PROJECT")
+                
+                if project_id:
+                    gcs_client = storage.Client(project=project_id)
+                else:
+                    # On Cloud Run, this should work without explicit project ID
+                    # For local development, ensure gcloud auth application-default login is done
+                    gcs_client = storage.Client()
+                
+                bucket_name = os.getenv("GCS_BUCKET")
+                if not bucket_name:
+                    raise Exception("Google Cloud Storage bucket not configured")
+                
+                bucket = gcs_client.bucket(bucket_name)
+                
+                # Create storage path using provider ID and inventory ID
+                file_extension = os.path.splitext(file.filename)[1] if file.filename else '.jpg'
+                storage_path = f"inventory/{provider_id}/{inventory_id}{file_extension}"
+                
+                # Create a blob (file) in the bucket
+                blob = bucket.blob(storage_path)
+                
+                # Reset image data stream position and prepare for upload
+                image_bytes = io.BytesIO()
+                image.save(image_bytes, format='JPEG', quality=85, optimize=True)
+                image_bytes.seek(0)
+                
+                # Set metadata
+                blob.metadata = {
+                    'provider_id': str(provider_id),
+                    'inventory_id': inventory_id,
+                    'original_filename': file.filename or 'unknown'
+                }
+                
+                # Upload to Google Cloud Storage
+                blob.upload_from_file(
+                    image_bytes,
+                    content_type='image/jpeg'
+                )
+                
+                # Make the blob publicly readable (optional - depends on your security requirements)
+                # blob.make_public()
+                
+                # Generate public URL
+                image_url = f"https://storage.googleapis.com/{bucket_name}/{storage_path}"
+                
+                # Update inventory item with image URL
+                inventory_item.image_url = image_url
+                inventory_item.storage_path = storage_path
+                db.add(inventory_item)
+                db.commit()
+                
+                print(f"Image uploaded successfully to Google Cloud Storage: {image_url}")
+                
+            except Exception as upload_error:
+                print(f"Image upload failed: {upload_error}")
+                # Continue without failing the entire operation
+                inventory_item.image_url = None
+                inventory_item.storage_path = None
+                
+                # Still commit the inventory item without the image
+                try:
+                    db.add(inventory_item)
+                    db.commit()
+                except Exception as db_error:
+                    print(f"Database update after upload failure also failed: {db_error}")
+                    db.rollback()
+
+
         except (json.JSONDecodeError, AttributeError):
             # Fallback if JSON parsing fails - generate a simple ID
             inventory_id = str(uuid.uuid4())
@@ -162,12 +271,13 @@ async def upload_inventory(file: UploadFile = File(...), db: Session = Depends(g
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Error processing inventory image: {str(e)}")
 
-@router.get("/inventory")
+@router.get("/inventories")
 async def get_provider_inventory(db: Session = Depends(get_database_session)):
     """Get provider's inventory list from database"""
     try:
-        # Get all inventory items from database
-        inventory_items = db.query(InventoryItem).all()
+        # Get all inventory items from database with provider information
+        inventory_items = db.query(InventoryItem).join(Provider).all()
+
         
         items = []
         for item in inventory_items:
@@ -177,14 +287,13 @@ async def get_provider_inventory(db: Session = Depends(get_database_session)):
                 "category": item.category,
                 "description": item.description,
                 "condition": item.condition,
-                "estimated_price": {
-                    "min": item.estimated_price_min,
-                    "max": item.estimated_price_max,
-                    "currency": item.currency
-                },
                 "marketability_score": item.marketability_score,
+                "image_url": item.image_url,
                 "upload_date": item.created_at.isoformat() + "Z" if item.created_at else None,
-                "status": item.status.value if item.status else "active"
+                "status": item.status.value if item.status else "active",
+                "provider_name": item.provider.name,
+                "business_address": item.provider.business_address,
+                "business_address_map_url": f"https://maps.google.com/maps?q={item.provider.business_address.replace(' ', '+')}" if item.provider.business_address else None,
             })
         
         return {
@@ -241,11 +350,57 @@ async def update_inventory_item(inventory_id: str, update_data: Dict[str, Any]):
     }
 
 @router.delete("/inventory/{inventory_id}")
-async def delete_inventory_item(inventory_id: str):
+async def delete_inventory_item(inventory_id: str, db: Session = Depends(get_database_session)):
     """Delete an inventory item"""
-    return {
-        "message": f"Inventory item {inventory_id} deleted successfully",
-        "inventory_id": inventory_id,
-        "deleted_at": datetime.now().isoformat() + "Z",
-        "user_type": "provider"
-    }
+    try:
+        # Find the inventory item by ID
+        inventory_item = db.query(InventoryItem).filter(InventoryItem.id == inventory_id).first()
+        
+        if not inventory_item:
+            raise HTTPException(status_code=404, detail=f"Inventory item {inventory_id} not found")
+        
+        # Store item details for response before deletion
+        item_name = inventory_item.product_name
+        storage_path = inventory_item.storage_path
+        
+        # Delete the inventory item from database
+        db.delete(inventory_item)
+        db.commit()
+        
+        # Optionally delete the image from Google Cloud Storage
+        if storage_path:
+            try:
+                project_id = os.getenv("GOOGLE_CLOUD_PROJECT")
+                bucket_name = os.getenv("GCS_BUCKET")
+                
+                if bucket_name:
+                    if project_id:
+                        gcs_client = storage.Client(project=project_id)
+                    else:
+                        gcs_client = storage.Client()
+                    
+                    bucket = gcs_client.bucket(bucket_name)
+                    blob = bucket.blob(storage_path)
+                    
+                    # Delete the blob if it exists
+                    if blob.exists():
+                        blob.delete()
+                        print(f"Image deleted from Google Cloud Storage: {storage_path}")
+                    
+            except Exception as gcs_error:
+                print(f"Warning: Could not delete image from storage: {gcs_error}")
+                # Continue even if image deletion fails
+        
+        return {
+            "message": f"Inventory item '{item_name}' deleted successfully",
+            "inventory_id": inventory_id,
+            "deleted_at": datetime.now().isoformat() + "Z",
+            "user_type": "provider"
+        }
+        
+    except HTTPException:
+        # Re-raise HTTP exceptions (like 404)
+        raise
+    except Exception as e:
+        db.rollback()
+        raise HTTPException(status_code=500, detail=f"Error deleting inventory item: {str(e)}")

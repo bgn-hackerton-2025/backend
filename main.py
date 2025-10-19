@@ -2,6 +2,7 @@ from fastapi import FastAPI, File, UploadFile, HTTPException, Depends
 from fastapi.responses import JSONResponse, FileResponse
 from fastapi.staticfiles import StaticFiles
 from sqlalchemy.orm import Session
+from sqlalchemy import text
 import google.generativeai as genai
 from PIL import Image
 import io
@@ -47,7 +48,7 @@ async def health_check(db: Session = Depends(get_database_session)):
     """Health check endpoint that also verifies database connection"""
     try:
         # Test database connection by running a simple query
-        db.execute("SELECT 1")
+        db.execute(text("SELECT 1"))
         return {
             "status": "healthy",
             "message": "API and database are working",
@@ -139,6 +140,128 @@ async def get_migration_status():
             "error": str(e),
             "timestamp": "2025-10-18T23:00:00Z"
         }
+
+@app.post("/admin/create-test-data")
+async def create_test_data(db: Session = Depends(get_database_session)):
+    """Create test data for providers and inventory items"""
+    try:
+        print("🔄 Creating test data...")
+        
+        # Import the test data creation functions
+        from database.models import Provider, ProviderStatus, InventoryItem, InventoryStatus
+        from database.crud import ProviderCRUD
+        import uuid
+        from datetime import datetime
+        
+        # Test provider data
+        providers_data = [
+            {
+                "id": uuid.UUID("550e8400-e29b-41d4-a716-446655440001"),
+                "name": "SVP Thrift store",
+                "email": "contact@techexpert.com",
+                "phone": "+1-555-0123",
+                "business_name": "Tech Expert Solutions LLC",
+                "specializations": ["Electronics", "Gadgets", "Smart Devices"],
+                "bio": "Leading provider of electronics classification with over 10 years of experience in consumer technology analysis.",
+                "experience_years": 10,
+                "rating": 4.8,
+                "total_tasks_completed": 1247,
+                "average_completion_time_minutes": 25,
+                "status": ProviderStatus.ACTIVE,
+                "is_verified": True,
+                "business_address": "123 Tech Street, San Francisco, CA 94105",
+                "tax_id": "12-3456789"
+            },
+            {
+                "id": uuid.UUID("550e8400-e29b-41d4-a716-446655440002"),
+                "name": "Fashion Insight Co",
+                "email": "hello@fashioninsight.com",
+                "phone": "+1-555-0456",
+                "business_name": "Fashion Insight Company",
+                "specializations": ["Clothing", "Accessories", "Vintage Fashion"],
+                "bio": "Fashion classification experts specializing in vintage and contemporary clothing analysis.",
+                "experience_years": 8,
+                "rating": 4.6,
+                "total_tasks_completed": 892,
+                "average_completion_time_minutes": 18,
+                "status": ProviderStatus.ACTIVE,
+                "is_verified": True,
+                "business_address": "456 Fashion Ave, New York, NY 10001",
+                "tax_id": "98-7654321"
+            }
+        ]
+        
+        created_providers = []
+        created_items = []
+        
+        # Create test providers
+        for provider_data in providers_data:
+            # Check if provider already exists
+            existing_provider = db.query(Provider).filter(Provider.id == provider_data["id"]).first()
+            if not existing_provider:
+                provider = Provider(**provider_data)
+                db.add(provider)
+                created_providers.append(provider_data["name"])
+        
+        # Create sample inventory item
+        sample_inventory = {
+            "id": uuid.uuid4(),
+            "provider_id": uuid.UUID("550e8400-e29b-41d4-a716-446655440001"),
+            "product_name": "AGOLDE High-Rise Wide-Leg Jeans",
+            "description": "High-rise, wide-leg jeans in a classic blue wash. Features include a zip fly, button closure, five-pocket styling, and a comfortable fit.",
+            "category": "Clothing",
+            "subcategory": "Jeans",
+            "brand": "AGOLDE",
+            "condition": "New",
+            "color": "Blue",
+            "material": "Denim (likely cotton or a cotton blend)",
+            "estimated_price_min": 180.0,
+            "estimated_price_max": 300.0,
+            "currency": "EUR",
+            "marketability_score": 8.0,
+            "key_features": ["High-rise waist", "Wide-leg silhouette", "Classic blue wash", "Five-pocket styling", "Zip fly with button closure"],
+            "tags": ["jeans", "denim", "wide leg", "high rise", "blue wash", "AGOLDE", "womenswear", "casual"],
+            "status": InventoryStatus.ACTIVE,
+            "ai_analysis_raw": {
+                "confidence_score": 0.95,
+                "analysis_version": "v1.0"
+            }
+        }
+        
+        # Check if inventory item already exists
+        existing_item = db.query(InventoryItem).filter(InventoryItem.product_name == sample_inventory["product_name"]).first()
+        if not existing_item:
+            inventory_item = InventoryItem(**sample_inventory)
+            db.add(inventory_item)
+            created_items.append(sample_inventory["product_name"])
+        
+        # Commit all changes
+        db.commit()
+        
+        return {
+            "status": "success",
+            "message": "Test data created successfully",
+            "created": {
+                "providers": created_providers,
+                "inventory_items": created_items
+            },
+            "total_created": {
+                "providers": len(created_providers),
+                "inventory_items": len(created_items)
+            },
+            "timestamp": datetime.now().isoformat() + "Z"
+        }
+        
+    except Exception as e:
+        db.rollback()
+        raise HTTPException(
+            status_code=500,
+            detail={
+                "status": "error",
+                "message": "Error creating test data",
+                "error": str(e)
+            }
+        )
 
 # ============== GENERAL PROVIDER ROUTES ==============
 

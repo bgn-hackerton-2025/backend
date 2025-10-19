@@ -35,6 +35,14 @@ Visit `/admin` on your deployed service for a web UI to:
 - Run migrations with confirmation
 - Check application health
 
+## 🖼️ Image Storage
+
+The app now uses **Google Cloud Storage** for storing uploaded inventory images:
+- **Environment Variable**: `GCS_BUCKET=your-bucket-name`
+- **Storage Path**: `inventory/{provider_id}/{inventory_id}.jpg`
+- **Public URLs**: `https://storage.googleapis.com/your-bucket/...`
+- **Authentication**: Automatic on Cloud Run (service account)
+
 ## 📋 Local Testing
 
 Your local endpoints (port 8001):

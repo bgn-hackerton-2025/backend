@@ -159,3 +159,13 @@ class InventoryListResponse(BaseModel):
     inventory_items: List[InventoryItemResponse]
     total_items: int
     active_items: int
+
+# Search Schemas
+class InventorySearchRequest(BaseModel):
+    query: str = Field(..., min_length=1, max_length=255, description="Search query; keywords matched in description")
+
+class InventorySearchResponse(BaseModel):
+    message: str
+    inventory_items: List[InventoryItemResponse]
+    total_matches: int
+    query: str
