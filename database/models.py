@@ -93,8 +93,9 @@ class InventoryItem(Base):
     
     # Image information
     original_filename = Column(String(255), nullable=True)
-    image_url = Column(String(500), nullable=True)  # Path to stored image
+    image_url = Column(String(500), nullable=True)  # Public URL to stored image
     image_content_type = Column(String(100), nullable=True)
+    storage_path = Column(String(500), nullable=True)  # Storage path in GCS bucket
     
     # Status and management
     status = Column(SQLEnum(InventoryStatus), default=InventoryStatus.ACTIVE)

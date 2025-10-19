@@ -172,3 +172,4 @@ logs/
 test_results/
 
 .direnv/
+imgs

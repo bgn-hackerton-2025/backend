@@ -20,14 +20,14 @@
 Your existing Cloud Build trigger automatically deploys when you push to the `main` branch.
 **This is your current setup and it works perfectly!**
 
-### Method 2: Direct gcloud deploy (Manual).
+### Method 2: Direct gcloud deploy (Manual)
 ```bash
 gcloud run deploy classifier \
   --source . \
   --platform managed \
   --region us-central1 \
   --allow-unauthenticated \
-  --set-env-vars GOOGLE_API_KEY=your_api_key,DATABASE_URL=your_postgres_connection_string
+  --set-env-vars GOOGLE_API_KEY=your_api_key,DATABASE_URL=your_postgres_connection_string,GCS_BUCKET=your-bucket-name
 ```
 
 ## Running Migrations
@@ -60,6 +60,9 @@ curl http://localhost:8000/admin/migration-status
 ### Runtime Variables  
 - `GOOGLE_API_KEY`: Your Google Generative AI API key
 - `DATABASE_URL`: PostgreSQL connection string (same as build-time)
+- `GCS_BUCKET`: Google Cloud Storage bucket name for image storage
+
+**Note**: On Cloud Run, Google Cloud Storage authentication is handled automatically by the service account. No additional credentials needed for production deployment.
 
 ## Database Connection String Format
 

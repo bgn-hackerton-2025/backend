@@ -25,7 +25,7 @@ This project provides tools to analyze images using Google's Gemini AI model.
 pip install -r requirements.txt
 ```
 
-Or install manually:
+Or install manually:,,
 ```bash
 pip install google-generativeai pillow streamlit
 ```
