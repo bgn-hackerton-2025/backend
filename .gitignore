@@ -177,3 +177,4 @@ runserver.sh
 response.json
 
 generated_image/generated_image.png
+.direnv/
