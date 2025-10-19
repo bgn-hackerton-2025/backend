@@ -171,4 +171,5 @@ logs/
 .coverage
 test_results/
 
+.direnv/
 imgs
