@@ -170,3 +170,5 @@ logs/
 # Testing
 .coverage
 test_results/
+
+.direnv/
