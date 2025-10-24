@@ -1,3 +1,6 @@
+# View Live Apllication 
+https://v0.app/chat/lemon-loop-app-et4NyR1wuOY?b=v0-preview-b_amM8poKOv6e&f=1&path=%2F 
+
 # Virtual Environment Setup
 python3 -m venv .venv
 source .venv/bin/activate
