@@ -1,5 +1,6 @@
 # View Live Application 
 https://v0.app/chat/lemon-loop-app-et4NyR1wuOY?b=v0-preview-b_amM8poKOv6e&f=1&path=%2F 
+(be mindful that any Gemini related API calls won't work in live application as we no longer have access to our Google Cloud Platform accounts/credits)
 
 # Virtual Environment Setup
 python3 -m venv .venv
