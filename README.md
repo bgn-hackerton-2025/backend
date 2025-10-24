@@ -27,7 +27,7 @@ pip install -r requirements.txt
 
 Or install manually:,,
 ```bash
-pip install google-generativeai pillow streamlit
+pip install google-genai pillow streamlit
 ```
 
 ### 3. Set Environment Variable (Optional)
